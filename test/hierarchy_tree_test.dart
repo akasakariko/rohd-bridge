@@ -7,10 +7,24 @@
 // 2026 September 12
 // Author: KayanoLiam <Kayano04@outlook.jp>
 
+import 'package:rohd/rohd.dart';
 import 'package:rohd_bridge/rohd_bridge.dart';
 import 'package:test/test.dart';
 
+class _HierarchyTreeModule extends BridgeModule {
+  _HierarchyTreeModule() : super('top');
+
+  @override
+  String hierarchyTree() => 'Bridge hierarchy:\n${super.hierarchyTree()}';
+}
+
 void main() {
+  test('hierarchy tree can be overridden in BridgeModule subclasses', () {
+    final top = _HierarchyTreeModule()..addSubModule(BridgeModule('leaf'));
+
+    expect(top.hierarchyTree(), 'Bridge hierarchy:\ntop\n└── leaf');
+  });
+
   test('single module has only its name', () {
     expect(BridgeModule('leaf').hierarchyTree(), 'leaf');
   });
@@ -48,7 +62,7 @@ void main() {
       );
 
     expect(
-      topMod.findSubModule('myUpperMid')!.hierarchyTree(),
+      (topMod.findSubModule('myUpperMid')! as BridgeModule).hierarchyTree(),
       'myUpperMid\n'
       '├── myLowerMid\n'
       '│   ├── myLeaf\n'
@@ -69,6 +83,35 @@ void main() {
       '└── u_cpu (cpu)',
     );
   });
+
+  for (final nested in [false, true]) {
+    test('built bridge leaf excludes internal logic (nested: $nested)',
+        () async {
+      final leaf = BridgeModule('leaf');
+      final a = leaf.addInput('a', Logic());
+      leaf.addOutput('y') <= ~a;
+
+      final root = nested ? BridgeModule('top') : leaf;
+      if (nested) {
+        root
+          ..addSubModule(leaf)
+          ..addInput('a', null)
+          ..addOutput('y');
+        connectPorts(root.port('a'), leaf.port('a'));
+        connectPorts(leaf.port('y'), root.port('y'));
+      }
+
+      final expected = nested ? 'top\n└── leaf' : 'leaf';
+      expect(root.hierarchyTree(), expected);
+
+      await root.build();
+
+      expect(leaf.subModules, isNotEmpty);
+      expect(leaf.subBridgeModules, isEmpty);
+      expect(leaf.hierarchyTree(), 'leaf');
+      expect(root.hierarchyTree(), expected);
+    });
+  }
 
   test('constructed tree is unchanged after build', () async {
     final top = BridgeModule('top');
