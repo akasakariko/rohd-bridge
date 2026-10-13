@@ -1,4 +1,4 @@
-## 0.2.5
+## Next release
 
 - Added `BridgeModule.hierarchyTree` to pretty-print the constructed bridge hierarchy from a given bridge module down (<https://github.com/intel/rohd-bridge/pull/69>).
 
